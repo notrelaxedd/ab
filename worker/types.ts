@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Every stage the worker knows about. SQL only checks the ^[A-Z_]+$ shape, so
-// adding a stage here needs no migration (docs/decisions.md D5).
+// adding a stage here needs no migration (docs/decisions.md D3).
 export const StageName = z.enum([
   'NOOP',
   'IDEATE',

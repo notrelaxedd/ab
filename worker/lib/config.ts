@@ -27,12 +27,20 @@ export interface WorkerConfig {
   shutdownGraceMs: number;
 }
 
+/**
+ * Stable across pm2 restarts (hostname:pm_id) so startup recovery finds the previous run's orphans. Outside
+ * pm2 there is no stable id, so use the pid: a manual run must never share an id with the pm2 worker.
+ */
+export function defaultWorkerId(env: NodeJS.ProcessEnv, pid: number = process.pid): string {
+  const pm = env.pm_id;
+  return `${os.hostname()}:${pm !== undefined && pm !== '' ? pm : `pid${pid}`}`;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
   const parsed = EnvSchema.parse(env);
   return {
     databaseUrl: parsed.DATABASE_URL,
-    // Stable across pm2 restarts so startup recovery can find this worker's orphans.
-    workerId: parsed.WORKER_ID ?? `${os.hostname()}:${env.pm_id ?? '0'}`,
+    workerId: parsed.WORKER_ID ?? defaultWorkerId(env),
     tickMs: parsed.TICK_MS,
     claudeBin: parsed.CLAUDE_BIN,
     repoRoot: REPO_ROOT,

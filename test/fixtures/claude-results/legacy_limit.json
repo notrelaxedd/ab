@@ -1,0 +1,23 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": true,
+  "api_error_status": null,
+  "duration_ms": 1234,
+  "duration_api_ms": 1100,
+  "num_turns": 1,
+  "result": "Claude AI usage limit reached|1712345678",
+  "stop_reason": "end_turn",
+  "session_id": "fake-session-0001",
+  "total_cost_usd": 0,
+  "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 20
+  },
+  "modelUsage": {},
+  "permission_denials": [],
+  "terminal_reason": null,
+  "uuid": "00000000-0000-4000-8000-000000000001"
+}

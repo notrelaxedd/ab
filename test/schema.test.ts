@@ -49,16 +49,31 @@ describe('schema', () => {
     expect(Number(ms!.remaining_usd)).toBe(80);
   });
 
-  it('denies the anon role access to tables, views and claim_task', async () => {
+  // createTestDb reproduces Supabase's default grants, so these only pass because of the security migration.
+  describe.each(['anon', 'authenticated'])('role %s', (role) => {
     const tryAs = (q: string) =>
       db.sql.begin(async (tx) => {
-        await tx.unsafe('set local role anon');
+        await tx.unsafe(`set local role ${role}`);
         return tx.unsafe(q);
       });
-    await expect(tryAs('select * from settings')).rejects.toThrow(/permission denied/);
-    await expect(tryAs('select * from tasks')).rejects.toThrow(/permission denied/);
-    await expect(tryAs('select * from venture_spend')).rejects.toThrow(/permission denied/);
-    await expect(tryAs('select * from monthly_spend')).rejects.toThrow(/permission denied/);
-    await expect(tryAs(`select * from claim_task('x')`)).rejects.toThrow(/permission denied/);
+
+    it('is denied existing tables, views, sequences and claim_task', async () => {
+      await expect(tryAs('select * from settings')).rejects.toThrow(/permission denied/);
+      await expect(tryAs('select * from tasks')).rejects.toThrow(/permission denied/);
+      await expect(tryAs('select * from venture_spend')).rejects.toThrow(/permission denied/);
+      await expect(tryAs('select * from monthly_spend')).rejects.toThrow(/permission denied/);
+      await expect(tryAs(`select * from claim_task('x')`)).rejects.toThrow(/permission denied/);
+      await expect(tryAs(`insert into tasks (stage) values ('NOOP')`)).rejects.toThrow(/permission denied/);
+    });
+
+    it('is denied objects created by later migrations', async () => {
+      const t = `later_${role}_t`;
+      await db.sql.unsafe(`create table ${t} (id int)`);
+      await db.sql.unsafe(`create sequence ${t}_seq`);
+      await db.sql.unsafe(`create function ${t}_fn() returns int language sql as 'select 1'`);
+      await expect(tryAs(`select * from ${t}`)).rejects.toThrow(/permission denied/);
+      await expect(tryAs(`select nextval('${t}_seq')`)).rejects.toThrow(/permission denied/);
+      await expect(tryAs(`select ${t}_fn()`)).rejects.toThrow(/permission denied/);
+    });
   });
 });

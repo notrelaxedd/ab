@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.claude/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(**/.claude/**)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Bash(curl *)",
+      "Bash(wget *)"
+    ]
+  },
+  "hooks": {}
+}

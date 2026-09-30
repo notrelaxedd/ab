@@ -30,6 +30,26 @@ begin
 end;
 $$;
 
+-- Objects created by LATER migrations must not be exposed either. Supabase's ALTER DEFAULT PRIVILEGES grant
+-- ALL on new tables, sequences and functions in public to anon/authenticated, and Postgres gives PUBLIC
+-- EXECUTE on new functions. Revoke both for the role running migrations (postgres on Supabase). A later
+-- migration that needs service_role access must grant it explicitly. (The function revoke from public is
+-- global: a schema-scoped one cannot remove the built-in default.)
+do $$
+declare
+  r text;
+begin
+  foreach r in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = r) then
+      execute format('alter default privileges in schema public revoke all on tables from %I', r);
+      execute format('alter default privileges in schema public revoke all on sequences from %I', r);
+      execute format('alter default privileges in schema public revoke all on functions from %I', r);
+    end if;
+  end loop;
+end;
+$$;
+alter default privileges revoke execute on functions from public;
+
 revoke all on function claim_task(text) from public;
 revoke all on function set_updated_at() from public;
 

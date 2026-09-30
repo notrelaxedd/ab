@@ -1,9 +1,18 @@
 // Retry / backoff policy in one place so tests and docs can point at it.
+import { KILL_OVERHEAD_MS } from './lib/claude.js';
 
 export const MAX_ATTEMPTS = 3;
 
 /** Extra time past a stage's timeout before a 'running' task is considered orphaned. */
 export const LEASE_GRACE_MS = 5 * 60_000;
+
+/**
+ * How long a claimed task may legitimately stay 'running': runStage can start claude twice (first run plus
+ * the --resume correction), each up to timeoutMs plus the kill grace, then the grace period on top.
+ */
+export function leaseMs(timeoutMs: number): number {
+  return 2 * (timeoutMs + KILL_OVERHEAD_MS) + LEASE_GRACE_MS;
+}
 
 const MINUTE = 60_000;
 const DEFER_BASE_MS = 30 * MINUTE;

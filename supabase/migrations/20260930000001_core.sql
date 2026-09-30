@@ -1,5 +1,5 @@
 -- Core tables for Venture Engine.
--- Enumerations are text + CHECK constraints (see docs/decisions.md D5).
+-- Enumerations are text + CHECK constraints (see docs/decisions.md D3).
 -- Stage names are validated in TypeScript (worker/stages/registry.ts); SQL only checks the shape.
 
 create or replace function set_updated_at() returns trigger

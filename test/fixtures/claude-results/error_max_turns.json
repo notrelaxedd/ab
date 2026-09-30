@@ -1,0 +1,26 @@
+{
+  "type": "result",
+  "subtype": "error_max_turns",
+  "is_error": true,
+  "api_error_status": null,
+  "duration_ms": 1234,
+  "duration_api_ms": 1100,
+  "num_turns": 3,
+  "result": "",
+  "stop_reason": "end_turn",
+  "session_id": "fake-session-0001",
+  "total_cost_usd": 0.02,
+  "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 20
+  },
+  "modelUsage": {},
+  "permission_denials": [],
+  "terminal_reason": "max_turns",
+  "uuid": "00000000-0000-4000-8000-000000000001",
+  "errors": [
+    "Reached maximum number of turns (3)"
+  ]
+}

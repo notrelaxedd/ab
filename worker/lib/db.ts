@@ -167,13 +167,21 @@ export async function failTask(
   sql: Sql,
   id: string,
   workerId: string,
-  r: { error: string; retryDelayMs: number; sessionId?: string | null; maxAttempts?: number },
+  r: {
+    error: string;
+    retryDelayMs: number;
+    sessionId?: string | null;
+    maxAttempts?: number;
+    /** Only act if the lock is at least this old (the reaper's expiry check, re-done under the row lock). */
+    lockedBefore?: Date;
+  },
 ): Promise<FailResult> {
   const maxAttempts = r.maxAttempts ?? MAX_ATTEMPTS;
   return sql.begin(async (tx) => {
     const rows = await tx<{ attempt: number; venture_id: string | null; stage: string }[]>`
       select attempt, venture_id, stage from tasks
        where id = ${id} and status = 'running' and locked_by = ${workerId}
+         and (${r.lockedBefore ?? null}::timestamptz is null or locked_at is null or locked_at <= ${r.lockedBefore ?? null}::timestamptz)
        for update`;
     const t = rows[0];
     if (!t) return 'lost_lock' as const;
@@ -209,15 +217,70 @@ export async function failTask(
   }) as Promise<FailResult>;
 }
 
-/** Startup recovery: tasks this worker id left 'running' (it just started, so they are orphans). */
+/**
+ * Startup recovery: tasks this worker id left 'running' (it just started, so they are orphans).
+ * The interrupted attempt was counted at claim, so this goes through failTask: a task that has used
+ * all its attempts fails (and pauses its venture) instead of crash-looping forever.
+ */
 export async function requeueOwnOrphans(sql: Sql, workerId: string): Promise<number> {
-  const rows = await sql`
-    update tasks
-       set status = 'pending', locked_by = null, locked_at = null,
-           error = 'requeued at worker startup (previous run was interrupted)'
-     where status = 'running' and locked_by = ${workerId}
-    returning id`;
-  return rows.length;
+  const rows = await sql<{ id: string }[]>`
+    select id from tasks where status = 'running' and locked_by = ${workerId}`;
+  let n = 0;
+  for (const { id } of rows) {
+    const r = await failTask(sql, id, workerId, {
+      error: 'requeued at worker startup (previous run was interrupted)',
+      retryDelayMs: 0,
+    });
+    if (r !== 'lost_lock') n++;
+  }
+  return n;
+}
+
+export interface WorkerLock {
+  release(): Promise<void>;
+}
+
+/**
+ * Takes a session-level advisory lock for this worker id on a dedicated connection, so two live processes
+ * can never share an id (which would make requeueOwnOrphans steal live tasks). Returns null if another
+ * process holds it. `onLost` fires if the connection drops while held (the lock is gone with it).
+ * Needs a session-mode connection (Supabase session pooler or direct), as D1 already requires.
+ */
+export async function acquireWorkerLock(
+  databaseUrl: string,
+  workerId: string,
+  onLost?: () => void,
+): Promise<WorkerLock | null> {
+  let released = false;
+  const conn = postgres(databaseUrl, {
+    max: 1,
+    prepare: false,
+    onnotice: () => {},
+    idle_timeout: 0,
+    max_lifetime: null,
+    connect_timeout: 15,
+    onclose: () => {
+      if (!released) onLost?.();
+    },
+  });
+  try {
+    const rows = await conn`select pg_try_advisory_lock(hashtext(${`venture-engine:worker:${workerId}`})) as locked`;
+    if (rows[0]?.locked === true) {
+      return {
+        async release() {
+          released = true;
+          await conn.end({ timeout: 5 });
+        },
+      };
+    }
+  } catch (e) {
+    released = true;
+    await conn.end({ timeout: 1 }).catch(() => undefined);
+    throw e;
+  }
+  released = true;
+  await conn.end({ timeout: 5 });
+  return null;
 }
 
 export async function listRunningTasks(
@@ -236,7 +299,7 @@ export async function reapTask(
   sql: Sql,
   id: string,
   staleWorkerId: string,
-  r: { error: string; retryDelayMs: number },
+  r: { error: string; retryDelayMs: number; lockedBefore?: Date },
 ): Promise<FailResult> {
   return failTask(sql, id, staleWorkerId, r);
 }

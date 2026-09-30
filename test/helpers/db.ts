@@ -46,6 +46,17 @@ export async function createTestDb(): Promise<TestDb> {
   const u = new URL(base);
   u.pathname = `/${name}`;
   const url = u.toString();
+  // Reproduce Supabase's default privileges (new public objects are granted to these roles) so the
+  // security migration's revokes are actually exercised; plain Postgres grants them nothing.
+  const pre = postgres(url, { max: 1, onnotice: () => {} });
+  try {
+    await pre.unsafe(`
+      alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+      alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+      alter default privileges in schema public grant all on functions to anon, authenticated, service_role;`);
+  } finally {
+    await pre.end();
+  }
   await migrate(url, { quiet: true });
 
   const pools: Sql[] = [];
