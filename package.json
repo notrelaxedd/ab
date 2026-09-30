@@ -1,0 +1,28 @@
+{
+  "name": "venture-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "worker": "tsx worker/index.ts",
+    "smoke:noop": "tsx scripts/smoke-noop.ts"
+  },
+  "dependencies": {
+    "postgres": "^3.4.9",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
